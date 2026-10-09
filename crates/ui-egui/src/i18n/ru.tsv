@@ -734,6 +734,7 @@
 	Amount	Эффект
 	Radius	Радиус
 	Radius:	Радиус:
+	Tolerance	Допуск
 	Tolerance:	Допуск:
 	Density	Плотность
 	Density:	Плотность:
@@ -2550,3 +2551,16 @@ fontWeight	Italic	Курсив
 	Color to Alpha…	Цвет в альфа-канал…
 	Transparency Threshold	Порог прозрачности
 	Opacity Threshold	Порог непрозрачности
+
+# Art History Brush (#213).
+	Art History Brush Tool	Инструмент «Кисть истории искусств»
+	Tight Short	Плотный короткий
+	Tight Medium	Плотный средний
+	Tight Long	Плотный длинный
+	Loose Medium	Свободный средний
+	Loose Long	Свободный длинный
+	Dab	Мазок
+	Tight Curl	Плотный завиток
+	Loose Curl	Свободный завиток
+	Area	Область
+	Stylized dabs from a history state	Стилизованные мазки из состояния истории

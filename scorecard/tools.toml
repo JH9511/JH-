@@ -249,3 +249,10 @@ target = "Crop: drag outside the frame to rotate it (Shift 15 deg steps, angle r
 status = "done"
 issue = 1792
 note = "image.crop angle param (image_cmds.rs: Image Rotation > Arbitrary + crop, one undo step); crop_ui.rs turns, moves and resizes the frame along its axes (Classic Mode visuals); UiState.crop_angle"
+
+[[item]]
+id = "TOOL-213-19"
+target = "Art History Brush: Y-group, styles, Area, Tolerance, paints from a history state"
+status = "done"
+issue = 213
+note = "paint.artHistoryBrush + Tool::ArtHistoryBrush in the Y flyout; Tight/Loose/Dab/Curl styles, Area, Tolerance"
