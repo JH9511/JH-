@@ -14,6 +14,9 @@ on:
         description: "Seconds per fuzz target"
         default: "600"
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -151,6 +154,8 @@ jobs:
     name: corpus tests
     runs-on: ubuntu-latest
     env:
+      PSD_TOOLS_VERSION: '1.24.0' # https://github.com/psd-tools/psd-tools/releases
+      PYTHON_VERSION: '3.14' # https://github.com/python/cpython/releases
       # test-corpus builds with --release, but here without the release profile's thin LTO and
       # single codegen unit: they ran LTO over the dependency graph for each of the ~95 corpus test
       # binaries, so building took 23.5 of the job's 37 minutes while the tests ran for 1.5.
@@ -174,6 +179,17 @@ jobs:
         run: cargo xtask corpus --all
       - name: Corpus tests
         run: cargo xtask test-corpus
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Independent PSD interoperability
+        run: |
+          python -m pip install --only-binary=:all: "psd-tools==$PSD_TOOLS_VERSION"
+          PHOTOCRAFT_PSD_EXPORTS=$(mktemp -d)
+          export PHOTOCRAFT_PSD_EXPORTS
+          trap 'rm -rf "$PHOTOCRAFT_PSD_EXPORTS"' EXIT
+          cargo test --release --locked -p photocraft-io --features corpus,heif --test psd_compat -- --ignored
+          python scripts/check-psd-exports.py "$PHOTOCRAFT_PSD_EXPORTS"
 
   wasm:
     name: wasm32 check

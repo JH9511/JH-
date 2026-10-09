@@ -420,6 +420,21 @@ cargo xtask test-corpus -- --nocapture   # pass arguments to the test binaries (
 scripts/fetch-corpus.sh            # the same as cargo xtask corpus --all
 ```
 
+The CI corpus job also checks selected PhotoCraft exports with psd-tools: PSD/PSB,
+RGB at 8/16/32 bits, Gray/CMYK at 8 bits, layer hierarchy, raster masks and ICC
+profiles. Install the `psd-tools` version pinned in `.github/workflows/ci.yml`, then:
+
+```sh
+PHOTOCRAFT_PSD_EXPORTS=$(mktemp -d)
+export PHOTOCRAFT_PSD_EXPORTS
+cargo test --release -p photocraft-io --features corpus,heif --test psd_compat -- --ignored
+python scripts/check-psd-exports.py "$PHOTOCRAFT_PSD_EXPORTS"
+rm -rf "$PHOTOCRAFT_PSD_EXPORTS"
+```
+
+These checks compare external reference files and decoded layer samples; they do
+not certify all Photoshop features or reproduce its rendering.
+
 **Opt-in locally, strict when opted in, always in CI.**
 
 - The corpus tests sit behind the `corpus` cargo feature of `photocraft-psd`, `photocraft-codecs`,
