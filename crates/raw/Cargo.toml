@@ -10,7 +10,7 @@ rust-version.workspace = true
 default = []
 # Synthetic raw-file generators (DNG / CR2 / TIFF-EP writers and a lossless-JPEG
 # encoder) for tests and fuzz seeds.
-testgen = []
+testgen = ["dep:image"]
 # Real-file corpus tests (opt-in; `cargo xtask test-corpus`). Fail when the corpus is missing.
 corpus = []
 
@@ -20,6 +20,11 @@ flate2 = { workspace = true }
 # JPEG XL-compressed DNG (DNG 1.7, e.g. Samsung Expert RAW). Pure Rust, MIT OR Apache-2.0. Pinned
 # exactly: it parses untrusted files; moving the pin is a reviewed change (re-run the raw fuzz target).
 jxl-oxide = { version = "=0.12.6", default-features = false }
+# Adobe DNG compression 34892: baseline JPEG tiles (lossy), decoded by zune-jpeg.
+zune-jpeg = "0.5"
+# Encodes the lossy-JPEG tiles of the testgen fixtures (feature `testgen`).
+image = { version = "0.25", default-features = false, features = ["jpeg"], optional = true }
+zune-core = "0.5"
 
 # Parallel bands on native; wasm builds stay single-threaded.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
