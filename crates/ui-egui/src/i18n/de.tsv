@@ -2315,3 +2315,9 @@ fontWeight	Italic	Kursiv
 	Color to Alpha…	Farbe zu Alpha…
 	Transparency Threshold	Transparenz-Schwellenwert
 	Opacity Threshold	Deckkraft-Schwellenwert
+
+	Drop an image, PSD or PDF anywhere to open it.	Ziehe ein Bild, PSD oder PDF an eine beliebige Stelle, um es zu öffnen.
+
+	Each artboard becomes one PDF page. Layers are flattened; transparency is preserved.	Jede Zeichenfläche wird zu einer PDF-Seite. Ebenen werden zusammengeführt; Transparenz bleibt erhalten.
+
+	Export All Tabs to PDF…	Alle Tabs als PDF exportieren…

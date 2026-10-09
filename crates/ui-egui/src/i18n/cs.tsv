@@ -2277,3 +2277,9 @@ fontWeight	Italic	Kurzíva
 	Color to Alpha…	Barva na alfu…
 	Transparency Threshold	Práh průhlednosti
 	Opacity Threshold	Práh krytí
+
+	Drop an image, PSD or PDF anywhere to open it.	Přetáhněte sem obrázek, PSD nebo PDF a otevře se.
+
+	Each artboard becomes one PDF page. Layers are flattened; transparency is preserved.	Každé kreslicí plátno se stane jednou stránkou PDF. Vrstvy se sloučí; průhlednost zůstane zachována.
+
+	Export All Tabs to PDF…	Exportovat všechny karty do PDF…
