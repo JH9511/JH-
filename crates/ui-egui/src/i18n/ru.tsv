@@ -2552,3 +2552,9 @@ fontWeight	Italic	Курсив
 	Color to Alpha…	Цвет в альфа-канал…
 	Transparency Threshold	Порог прозрачности
 	Opacity Threshold	Порог непрозрачности
+
+	Drop an image, PSD or PDF anywhere to open it.	Перетащите изображение, PSD или PDF в любое место окна, чтобы открыть.
+
+	Each artboard becomes one PDF page. Layers are flattened; transparency is preserved.	Каждая монтажная область становится страницей PDF. Слои объединяются; прозрачность сохраняется.
+
+	Export All Tabs to PDF…	Экспортировать все вкладки в PDF…

@@ -2287,3 +2287,9 @@ fontWeight	Italic	斜体
 	Color to Alpha…	颜色转为 Alpha…
 	Transparency Threshold	透明度阈值
 	Opacity Threshold	不透明度阈值
+
+	Drop an image, PSD or PDF anywhere to open it.	将图像、PSD 或 PDF 拖放到任意位置即可打开。
+
+	Each artboard becomes one PDF page. Layers are flattened; transparency is preserved.	每个画板成为一页 PDF。图层将合并，透明度会保留。
+
+	Export All Tabs to PDF…	将所有标签页导出为 PDF…

@@ -3389,3 +3389,9 @@ fontWeight	Thin	Πολύ λεπτά
 	Color to Alpha…	Χρώμα σε άλφα…
 	Transparency Threshold	Κατώφλι διαφάνειας
 	Opacity Threshold	Κατώφλι αδιαφάνειας
+
+	Drop an image, PSD or PDF anywhere to open it.	Σύρετε μια εικόνα, PSD ή PDF εδώ για να το ανοίξετε.
+
+	Each artboard becomes one PDF page. Layers are flattened; transparency is preserved.	Κάθε πίνακας γραφικών γίνεται μία σελίδα PDF. Τα επίπεδα συγχωνεύονται· η διαφάνεια διατηρείται.
+
+	Export All Tabs to PDF…	Εξαγωγή όλων των καρτελών σε PDF…
