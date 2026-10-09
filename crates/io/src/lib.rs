@@ -257,13 +257,18 @@ pub fn merged_composite(file: &PsdFile) -> Result<Vec<[f32; 4]>, IoError> {
     let h = &file.header;
     h.validate()?;
     if h.color_mode == photocraft_psd::ColorMode::Rgb && file.merged_has_alpha() {
-        // Unmatte in floats: the RGBA8 preview rounds again after removing the matte.
+        // Preserve native sample precision before removing the white matte.
         let raw = file.decode_merged()?;
         let plane = raw.len() / usize::from(h.channels);
         let planes = raw
             .chunks_exact(plane)
             .take(4)
-            .map(|bytes| photocraft_psd::pixels::plane_to_u8(bytes, h.depth, h.width as usize, h.height as usize))
+            .map(|bytes| match h.depth {
+                32 => Ok(photocraft_psd::pixels::samples_f32(bytes)),
+                16 => Ok(photocraft_psd::pixels::samples_u16(bytes).into_iter().map(|v| f32::from(v) / 65535.0).collect()),
+                _ => photocraft_psd::pixels::plane_to_u8(bytes, h.depth, h.width as usize, h.height as usize)
+                    .map(|values| values.into_iter().map(|v| f32::from(v) / 255.0).collect()),
+            })
             .collect::<Result<Vec<_>, _>>()?;
         let [r, g, b, a] = planes.as_slice() else { return Err(PsdError::Invalid("missing RGB composite channels".into()).into()) };
         return Ok(r
@@ -272,10 +277,13 @@ pub fn merged_composite(file: &PsdFile) -> Result<Vec<[f32; 4]>, IoError> {
             .zip(b)
             .zip(a)
             .map(|(((&r, &g), &b), &a)| {
-                let mut pixel = [r, g, b, a].map(|v| f32::from(v) / 255.0);
+                let mut pixel = [r, g, b, a];
                 let alpha = pixel[3];
                 for c in pixel.iter_mut().take(3) {
-                    *c = pixels::unmatte(*c, alpha, 1.0).clamp(0.0, 1.0);
+                    *c = pixels::unmatte(*c, alpha, 1.0);
+                    if h.depth != 32 {
+                        *c = c.clamp(0.0, 1.0);
+                    }
                 }
                 pixel
             })
