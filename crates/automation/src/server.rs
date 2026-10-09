@@ -188,8 +188,10 @@ pub struct UiSetParams {
     /// vectorMaskTarget, selectionMode, zoom, center, rotation (view angle in degrees), fit, theme (pro, proMedium, studio,
     /// studioLight, classic), brushSection, brushTab, brushesView, brushPicker ([x, y] opens the
     /// Brush Preset picker there, null closes it), brushPickerView, brushSize, gradientBlendMode
-    /// (a blend mode name, for the Gradient tool), gradientClassic (bool). Other fields are an
-    /// error.
+    /// (a blend mode name, for the Gradient tool), gradientClassic (bool), contextualTaskbar
+    /// ({visible?: bool, position?: null | [x, y]} with normalized coordinates from 0 to 1),
+    /// chatgptAccount (bool opens account settings), generative (local draft UI fields; generation
+    /// remains Coming soon). Other fields are an error. All fields are validated before any apply.
     pub fields: Value,
 }
 

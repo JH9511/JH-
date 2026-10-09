@@ -344,7 +344,29 @@ fn main() -> eframe::Result {
                         services::xwayland_command(var("FLATPAK_ID").as_deref(), var("APPIMAGE").as_deref(), std::env::var_os("DISPLAY").is_some());
                 }
             }
-            let mut app = PhotocraftApp::new(Session::new(), services);
+            let session = Session::new();
+            #[cfg(feature = "local-ml")]
+            let session = {
+                let mut session = session;
+                if let Some(dir) = services::config_dir() {
+                    session.configure_local_models(dir.join("Models"));
+                }
+                session
+            };
+            #[cfg(feature = "chatgpt")]
+            let (session, account_error) = {
+                let mut session = session;
+                let result = services::config_dir()
+                    .ok_or_else(|| "The configuration directory is unavailable".to_string())
+                    .and_then(|dir| session.configure_chatgpt(dir.join("ChatGPT")).map_err(|e| e.to_string()));
+                (session, result.err())
+            };
+            let mut app = PhotocraftApp::new(session, services);
+            #[cfg(feature = "chatgpt")]
+            if let Some(error) = account_error {
+                app.ui.status = format!("ChatGPT account storage: {error}");
+                app.ui.status_error = true;
+            }
             app.integrated_titlebar = cfg!(target_os = "macos");
             app.custom_titlebar = custom_titlebar;
             // Only the title bar's free gap drags the window, never the menus (mac_window.rs).

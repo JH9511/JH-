@@ -8,7 +8,7 @@
 //! - `engine.commands`: list commands with enablement
 //! - `ui.inspect`: full UI state (tool, panels, views, dialogs, windows, window size); the menu
 //!   tree is `ui.menu.list`
-//! - `ui.set {tool?, panels?, dock?, dockTabs?, dockWidth?, colorPanel?, maskTarget?, vectorMaskTarget?, selectionMode?, zoom?, center?, rotation?, fit?, theme?, brushSection?, brushTab?, brushesView?, brushPicker?, brushPickerView?, brushSize?}`:
+//! - `ui.set {tool?, panels?, dock?, dockTabs?, dockWidth?, colorPanel?, maskTarget?, vectorMaskTarget?, selectionMode?, zoom?, center?, rotation?, fit?, theme?, brushSection?, brushTab?, brushesView?, brushPicker?, brushPickerView?, brushSize?, contextualTaskbar?, chatgptAccount?, generative?}`:
 //!   change UI state; any other field is an error ([`UI_SET_FIELDS`])
 //! - `ui.dialog.open {kind, fields?}` (kinds: newDocument, about, layerStyle {effect?}, colorPicker {target: foreground|background}, command {command}) / `ui.dialog.set {dialog, field, value}` / `ui.dialog.confirm {dialog, wait?}` / `ui.dialog.cancel {dialog}`
 //! - `ui.dialog.apply {dialog}`: commit Preferences changes without closing the dialog
@@ -74,7 +74,10 @@ pub enum Outcome {
 /// field's value is validated before the first one is applied, so a typo, an unknown field, a
 /// bad value or a bad nested key can't reply with success while nothing — or only half of it —
 /// changed (#412).
-pub const UI_SET_FIELDS: [&str; 22] = [
+pub const UI_SET_FIELDS: [&str; 25] = [
+    "contextualTaskbar",
+    "chatgptAccount",
+    "generative",
     "tool",
     "panels",
     "dock",
@@ -280,6 +283,46 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
             if let Some(field) = p.as_object().and_then(|o| o.keys().find(|k| !UI_SET_FIELDS.contains(&k.as_str()))) {
                 return err(format!("unknown field `{field}` (fields: {})", UI_SET_FIELDS.join(", ")));
             }
+            let taskbar = if let Some(value) = p.get("contextualTaskbar") {
+                let Some(fields) = value.as_object() else { return err("contextualTaskbar must be an object") };
+                if fields.keys().any(|k| k != "visible" && k != "position") {
+                    return err("contextualTaskbar accepts visible and position only");
+                }
+                let mut state = app.ui.contextual_taskbar.clone();
+                if let Some(v) = fields.get("visible") {
+                    let Some(visible) = v.as_bool() else { return err("contextualTaskbar.visible must be a boolean") };
+                    state.visible = visible;
+                }
+                if let Some(v) = fields.get("position") {
+                    if v.is_null() {
+                        state.position = None;
+                    } else {
+                        let Ok(point) = serde_json::from_value::<[f32; 2]>(v.clone()) else {
+                            return err("contextualTaskbar.position must be null or two finite coordinates from 0 to 1");
+                        };
+                        if point.iter().any(|n| !n.is_finite() || !(0.0..=1.0).contains(n)) {
+                            return err("contextualTaskbar.position coordinates must be from 0 to 1");
+                        }
+                        state.position = Some(point);
+                    }
+                }
+                Some(state)
+            } else {
+                None
+            };
+            let account_open = if let Some(value) = p.get("chatgptAccount") {
+                let Some(open) = value.as_bool() else { return err("chatgptAccount must be a boolean") };
+                Some(open)
+            } else {
+                None
+            };
+            let generative = match p.get("generative") {
+                Some(value) => match app.ui.generative.patched(value) {
+                    Ok(state) => Some(state),
+                    Err(error) => return err(error),
+                },
+                None => None,
+            };
             let gradient_blend = if let Some(value) = p.get("gradientBlendMode") {
                 let Some(name) = value.as_str() else { return err("gradientBlendMode must be a blend mode name") };
                 let Some(mode) = photocraft_engine::commands::blend_from_str(name).filter(|m| photocraft_color::BlendMode::LAYER_MODES.contains(m)) else {
@@ -373,6 +416,15 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                 };
 
                 // Apply (nothing below can fail).
+                if let Some(state) = generative {
+                    app.ui.generative = state;
+                }
+                if let Some(bar) = taskbar {
+                    app.ui.contextual_taskbar = bar;
+                }
+                if let Some(open) = account_open {
+                    app.ui.chatgpt_account_open = open;
+                }
                 if let Some(t) = tool {
                     app.ui.tool = t;
                     // Each tool keeps its own brush (#218), so switch it in before `brushSize`
@@ -757,6 +809,10 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     json!({
         "window": {"width": screen.width(), "height": screen.height(), "pixelsPerPoint": ctx.pixels_per_point()},
         "tool": app.ui.tool,
+        "contextualTaskbar": app.ui.contextual_taskbar,
+        "chatgptAccountOpen": app.ui.chatgpt_account_open,
+        "generative": app.ui.generative,
+        "chatgpt": app.session.chatgpt_status(),
         "toolOptions": app.ui.tool_options,
         "magnetic": app.ui.magnetic,
         "textEdit": app.ui.text_edit,
@@ -942,6 +998,42 @@ mod tests {
     }
 
     #[test]
+    fn contextual_bar_control_rejects_bad_positions_and_can_restore_hidden_actions() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let ctx = egui::Context::default();
+        assert_eq!(call(&mut app, &ctx, "ui.set", json!({"contextualTaskbar":{"visible":false,"position":[0.2,0.8]}}))["ok"], true);
+        assert!(!app.ui.contextual_taskbar.visible);
+        let before = app.ui.contextual_taskbar.clone();
+        for bad in [json!({"position":[-1,0]}), json!({"position":[0,2]}), json!({"position":[0]}), json!({"visible":"yes"}), json!({"prompt":"x"})] {
+            assert_eq!(call(&mut app, &ctx, "ui.set", json!({"contextualTaskbar":bad}))["ok"], false);
+            assert_eq!(app.ui.contextual_taskbar, before);
+        }
+        crate::menus::invoke(&mut app, &ctx, "window.contextualTaskbar", json!({})).unwrap();
+        assert!(app.ui.contextual_taskbar.visible);
+        assert_eq!(call(&mut app, &ctx, "ui.set", json!({"contextualTaskbar":{"position":null},"chatgptAccount":true}))["ok"], true);
+        assert!(app.ui.chatgpt_account_open);
+        assert!(app.ui.contextual_taskbar.position.is_none());
+    }
+
+    #[test]
+    fn generative_controls_are_local_and_invalid_patches_change_nothing() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let ctx = egui::Context::default();
+        let before = app.ui.clone();
+        for bad in [json!({"width":0}), json!({"operation":"wrong"}), json!({"prompt":true}), json!({"endpoint":"https://example.invalid"})] {
+            assert_eq!(call(&mut app, &ctx, "ui.set", json!({"tool":"move","generative":bad}))["ok"], false);
+            assert_eq!(app.ui, before);
+        }
+        assert_eq!(
+            call(&mut app, &ctx, "ui.set", json!({"generative":{"open":true,"operation":"generate","prompt":"A blue bicycle","width":1024,"height":768}}))["ok"],
+            true
+        );
+        assert_eq!(call(&mut app, &ctx, "ui.inspect", json!({}))["result"]["generative"]["open"], true);
+        assert_eq!(call(&mut app, &ctx, "engine.execute", json!({"command":"generative.run"}))["ok"], false);
+        assert!(app.session.active().is_none());
+    }
+
+    #[test]
     fn ui_set_rejects_unknown_fields_before_changing_anything() {
         use crate::theme::ThemeKind;
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -1026,6 +1118,56 @@ mod tests {
         assert_eq!(serde_json::to_value(&app.ui.panels).unwrap_or_default(), panels_before, "nothing was applied");
         // Non-numeric brushSize keeps the API's historical silent no-op (see the dispatch test).
         assert_eq!(call(&mut app, &ctx, "ui.set", json!({"brushSize": "large"}))["ok"], true);
+    }
+
+    #[test]
+    fn ui_set_contextual_controls_and_upstream_fields_apply_together_or_not_at_all() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let ctx = egui::Context::default();
+        let before = app.ui.clone();
+        let contextual = json!({
+            "contextualTaskbar": {"visible": false, "position": [0.2, 0.8]},
+            "chatgptAccount": true,
+            "generative": {"open": true, "operation": "generate", "prompt": "A blue bicycle"}
+        });
+        // A late invalid upstream field must reject the earlier contextual/account/draft
+        // values too. None may be assigned before the validate-first closure.
+        for invalid in [
+            json!({"theme": "nope"}),
+            json!({"brushSize": 1e300}),
+            json!({"brushPickerView": "tiles"}),
+            json!({"brushPicker": [1]}),
+            json!({"panels": {"nope": true}}),
+            json!({"center": [1]}),
+            json!({"rotation": 90}), // requires an open document
+            json!({"gradientBlendMode": "nope"}),
+        ] {
+            let mut params = contextual.clone();
+            params.as_object_mut().unwrap().extend(invalid.as_object().unwrap().clone());
+            assert_eq!(call(&mut app, &ctx, "ui.set", params.clone())["ok"], false, "{params}");
+            assert_eq!(app.ui, before, "{params}: rejected fields changed UI state");
+        }
+        let mut valid = contextual;
+        valid
+            .as_object_mut()
+            .unwrap()
+            .extend(json!({"tool": "move", "brushPicker": [120, 80], "brushPickerView": "list", "gradientClassic": true}).as_object().unwrap().clone());
+        // Invalid new fields must also reject a valid upstream tool/picker change.
+        for invalid in [json!({"contextualTaskbar": {"position": [2, 0]}}), json!({"chatgptAccount": "yes"}), json!({"generative": {"width": 0}})] {
+            let mut params = valid.clone();
+            params.as_object_mut().unwrap().extend(invalid.as_object().unwrap().clone());
+            assert_eq!(call(&mut app, &ctx, "ui.set", params.clone())["ok"], false, "{params}");
+            assert_eq!(app.ui, before, "{params}: rejected fields changed UI state");
+        }
+        assert_eq!(call(&mut app, &ctx, "ui.set", valid)["ok"], true);
+        assert_eq!(app.ui.tool, Tool::Move);
+        assert_eq!(app.ui.brush_picker, Some([120.0, 80.0]));
+        assert_eq!(app.ui.brush_picker_list.view, crate::brush_panel::BrushesView::List);
+        assert!(!app.ui.contextual_taskbar.visible);
+        assert_eq!(app.ui.contextual_taskbar.position, Some([0.2, 0.8]));
+        assert!(app.ui.chatgpt_account_open);
+        assert!(app.ui.generative.open);
+        assert!(app.session.active().is_none(), "editing UI drafts must not create a document");
     }
 
     #[test]
