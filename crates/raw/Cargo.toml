@@ -21,10 +21,10 @@ flate2 = { workspace = true }
 # exactly: it parses untrusted files; moving the pin is a reviewed change (re-run the raw fuzz target).
 jxl-oxide = { version = "=0.12.6", default-features = false }
 # Adobe DNG compression 34892: baseline JPEG tiles (lossy), decoded by zune-jpeg.
-zune-jpeg = "0.5"
+zune-jpeg = { workspace = true }
 # Encodes the lossy-JPEG tiles of the testgen fixtures (feature `testgen`).
-image = { version = "0.25", default-features = false, features = ["jpeg"], optional = true }
-zune-core = "0.5"
+image = { workspace = true, features = ["jpeg"], optional = true }
+zune-core = { workspace = true }
 
 # Parallel bands on native; wasm builds stay single-threaded.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
