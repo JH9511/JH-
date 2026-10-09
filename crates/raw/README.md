@@ -39,6 +39,10 @@ Implemented only from public specifications, papers and observation of files:
   the exact bit layout and tone-curve scale were established by observation of sample files.
 * Panasonic RW2 RawFormat 5 and uncompressed Olympus ORF: established by observation of sample
   files (bit packing, page layout, sample justification).
+* Panasonic RW2 RawFormat 3/4 (vendor-compressed): the fixed-rate 16 bytes per 14 pixels, the
+  predictor groups with per-parity predictors, the 2/4/8-bit field widths, the page-permuted
+  downward bit order and the black level sitting 15 counts above the recorded tags were all
+  established by observation of sample files.
 * Demosaicing: Malvar, He & Cutler (ICASSP 2004); Hirakawa & Parks, "Adaptive
   homogeneity-directed demosaicing" (IEEE TIP 2005).
 * McCamy's CCT approximation (1992); the Bradford chromatic adaptation transform.
@@ -58,8 +62,9 @@ camera colour tables were copied.
 | Nikon compressed NEF (compression 34713): lossless and lossy type 1 / 2, 12 and 14 bit | Decoded: fixed Huffman tables + maker-note `0x0096` seeds and curve (see `src/nefc.rs`). BlackLevel `0x003d` is read in 14-bit units. "Lossy after split" files are unsupported (preview fallback) |
 | Sony compressed ARW ("cRAW", SonyRawFileType 2) | Decoded: 11-bit min/max + 7-bit delta blocks, SonyToneCurve to 14 bits |
 | Panasonic / Leica RW2, RawFormat 5 (12- and 14-bit packed) | Decoded, with PanasonicRaw black / white / WB / sensor borders |
+| Panasonic / Leica RW2, RawFormat 3 and 4 (vendor-compressed, 12-bit) | Decoded; the black level is read 15 counts above the recorded tag; PanasonicRaw white / WB / sensor borders |
 | Olympus ORF, uncompressed 16-bit (E-1, E-400…) | Decoded, with ImageProcessing black / WB / ValidBits / crop |
-| Nikon "lossy after split" NEF, Sony "Compressed RAW 2", Pentax compressed PEF, RW2 RawFormat 4 and older, Olympus compressed ORF | Unsupported: no public description of these codes was found apart from GPL decoder source, which this crate may not use (clean-room). `photocraft-io` opens the embedded JPEG preview instead |
+| Nikon "lossy after split" NEF, Sony "Compressed RAW 2", Pentax compressed PEF, RW2 RawFormat 6 and newer, Olympus compressed ORF | Unsupported: no public description of these codes was found apart from GPL decoder source, which this crate may not use (clean-room). `photocraft-io` opens the embedded JPEG preview instead |
 | CR3, RAF | Recognised, unsupported (preview fallback where a preview is found) |
 | X-Trans and other non-Bayer CFAs | Unsupported |
 
