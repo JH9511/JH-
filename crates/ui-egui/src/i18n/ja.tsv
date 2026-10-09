@@ -3304,3 +3304,15 @@ fontWeight	Italic	斜体
 	Color to Alpha…	カラーを透明に…
 	Transparency Threshold	透明のしきい値
 	Opacity Threshold	不透明度のしきい値
+
+# Art History Brush (#213).
+	Art History Brush Tool	アートヒストリーブラシツール
+	Tight Short	タイト・ショート
+	Tight Medium	タイト・ミディアム
+	Tight Long	タイト・ロング
+	Loose Medium	ルーズ・ミディアム
+	Loose Long	ルーズ・ロング
+	Dab	ダブ
+	Tight Curl	タイトカール
+	Loose Curl	ルーズカール
+	Stylized dabs from a history state	履歴状態から様式化したダブを描きます
