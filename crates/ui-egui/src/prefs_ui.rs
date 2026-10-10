@@ -1572,6 +1572,9 @@ mod recovery_tests;
 mod shortcut_capture_tests;
 
 #[cfg(test)]
+mod recovery_tests;
+
+#[cfg(test)]
 mod tests {
     #[test]
     fn colour_preferences_take_a_typed_hex_value() {
