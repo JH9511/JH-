@@ -66,9 +66,9 @@ pub mod file_open;
 pub mod file_ui;
 pub mod fill_ui;
 pub mod filter_dialog;
-mod font_preview;
 #[cfg(not(target_arch = "wasm32"))]
 mod filter_preview_worker;
+mod font_preview;
 pub mod gallery_ui;
 pub mod gpu_canvas;
 pub mod gpu_status;
@@ -1319,6 +1319,10 @@ impl eframe::App for PhotocraftApp {
         }
         // A device lost while drawing this frame: switch to the CPU canvas before the next one.
         gpu_status::check(self, &ctx);
+        // The Brush Preset picker's view (its gear's card parts and the footer scale) is
+        // remembered once the pointer is up. Here, after every panel, rather than in the
+        // picker's own code: the control channel can set it while the picker is closed.
+        brush_picker::persist(self, &ctx);
         self.automation_input = false;
         native_menu::sync(self, &ctx);
         if screen_picker::busy(&ctx) {
