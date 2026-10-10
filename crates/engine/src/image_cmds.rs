@@ -114,6 +114,9 @@ const MAX_RESAMPLE_BYTES: u64 = if cfg!(target_pointer_width = "64") { 8 << 30 }
 /// Image → Image Size.
 fn image_size(s: &mut Session, p: &Value) -> Result<Value> {
     let d = s.active().ok_or(EngineError::NoDocument)?;
+    if photocraft_compose::deep::any_deep(&d.doc.layers) {
+        return Err(EngineError::Other("deep layers cannot be resampled yet; their samples keep their depth".into()));
+    }
     let (ow, oh) = (d.doc.size.width, d.doc.size.height);
     let resample = parse_resample(p.get("resample").and_then(Value::as_str).unwrap_or("bicubic"));
     let pw = p.get("width").and_then(Value::as_f64);
@@ -180,6 +183,30 @@ fn bad(cmd: &str, msg: impl Into<String>) -> EngineError {
 
 /// Moves every surface, channel, selection and guide by `(dx, dy)`.
 ///
+/// Whether shifting `l` by `(dx, dy)` keeps every pixel store inside the i32 coordinate
+/// range: the content bounds of its surfaces and the canvas origin of deep data. Shared by
+/// the document, layer and smart-object moves, which all refuse such shifts with an error.
+pub(crate) fn layer_shift_fits(l: &Layer, dx: i32, dy: i32) -> bool {
+    let rect = |r: Rect| {
+        r.is_empty() || (r.x0.checked_add(dx).is_some() && r.x1.checked_add(dx).is_some() && r.y0.checked_add(dy).is_some() && r.y1.checked_add(dy).is_some())
+    };
+    let surface = |s: &photocraft_raster::Surface| rect(s.content_bounds());
+    l.mask.as_ref().is_none_or(|m| surface(&m.surface))
+        && l.fill_cache.as_ref().is_none_or(|fc| surface(&fc.surface))
+        && match &l.content {
+            LayerContent::Raster(s) => surface(s),
+            LayerContent::Text(t) => t.cache.as_ref().is_none_or(surface),
+            LayerContent::Deep(d) => d.x.checked_add(dx).is_some() && d.y.checked_add(dy).is_some(),
+            LayerContent::Group(g) => g.children.iter().all(|c| layer_shift_fits(c, dx, dy)),
+            _ => true,
+        }
+}
+
+/// [`layer_shift_fits`] over a whole layer list.
+pub(crate) fn layer_shift_fits_all(layers: &[Layer], dx: i32, dy: i32) -> bool {
+    layers.iter().all(|l| layer_shift_fits(l, dx, dy))
+}
+
 /// Fails, before moving anything, when some pixels would land outside the i32 coordinate
 /// range: the surface copy saturates its target rectangle there, which no longer matches
 /// the pixel data and panics (#959).
@@ -190,7 +217,7 @@ fn translate_doc(doc: &mut Document, cmd: &str, dx: i32, dy: i32) -> Result<()> 
     let fits = |r: Rect| {
         r.is_empty() || (r.x0.checked_add(dx).is_some() && r.x1.checked_add(dx).is_some() && r.y0.checked_add(dy).is_some() && r.y1.checked_add(dy).is_some())
     };
-    let mut ok = true;
+    let mut ok = layer_shift_fits_all(&doc.layers, dx, dy);
     for_each_surface(&mut doc.layers, true, &mut |surf, _| ok = ok && fits(surf.content_bounds()));
     ok = ok
         && doc.channels.iter().chain(doc.quick_mask.as_ref()).all(|ch| fits(ch.surface.content_bounds()))
@@ -199,6 +226,13 @@ fn translate_doc(doc: &mut Document, cmd: &str, dx: i32, dy: i32) -> Result<()> 
         return Err(bad(cmd, format!("moving the document by ({dx}, {dy}) would push its pixels outside the 32-bit coordinate range")));
     }
     for_each_surface(&mut doc.layers, true, &mut |surf, _| *surf = translate_surface(surf, dx, dy));
+    // Deep data has no surface; its canvas origin moves instead.
+    for_each_layer(&mut doc.layers, &mut |l| {
+        if let LayerContent::Deep(d) = &mut l.content {
+            d.x += dx;
+            d.y += dy;
+        }
+    });
     for ch in doc.channels.iter_mut().chain(doc.quick_mask.as_mut()) {
         ch.surface = translate_surface(&ch.surface, dx, dy);
     }
@@ -643,6 +677,57 @@ mod tests {
     }
 
     #[test]
+    fn deep_layers_move_with_the_canvas_and_refuse_resampling() {
+        let mut s = session();
+        // A 1-pixel deep layer with one opaque sample.
+        let deep = LayerContent::Deep(photocraft_doc::DeepData {
+            x: 0,
+            y: 0,
+            width: 40,
+            height: 20,
+            channels: vec![photocraft_doc::DeepChannel { name: "A".into(), samples: vec![1.0] }],
+            counts: vec![0, 1],
+        });
+        let id = s
+            .edit("deep", |doc, _| {
+                doc.layers.push(Layer::new("deep", deep));
+                let id = doc.layers.last().unwrap().id;
+                Ok(id)
+            })
+            .unwrap();
+        // Whole-canvas translation moves the data's origin, like every other content.
+        s.edit("move", |doc, _| {
+            translate_doc(doc, "move", 5, 7)?;
+            Ok(())
+        })
+        .unwrap();
+        assert!(matches!(&doc(&s).layer(id).unwrap().content, LayerContent::Deep(d) if d.x == 5 && d.y == 7));
+        // Resampling deep samples is refused instead of silently desyncing them.
+        let err = s.execute("image.imageSize", json!({"width": 20, "height": 10})).unwrap_err();
+        assert!(err.to_string().contains("deep layers"), "{err}");
+    }
+
+    #[test]
+    fn moving_the_canvas_refuses_a_deep_origin_overflow() {
+        let mut s = session();
+        let deep = LayerContent::Deep(photocraft_doc::DeepData {
+            x: i32::MAX - 5,
+            y: 0,
+            width: 40,
+            height: 20,
+            channels: vec![photocraft_doc::DeepChannel { name: "A".into(), samples: vec![1.0] }],
+            counts: vec![0, 1],
+        });
+        s.edit("deep", |doc, _| {
+            doc.layers.push(Layer::new("deep", deep));
+            Ok(())
+        })
+        .unwrap();
+        let err = s.edit("move", |doc, _| translate_doc(doc, "move", 10, 0)).unwrap_err();
+        assert!(err.to_string().contains("32-bit coordinate range"), "{err}");
+    }
+
+    #[test]
     fn image_size_scales_everything() {
         for resample in ["bicubic", "bilinear", "nearest", "lanczos", "preserveDetails"] {
             let mut s = session();
@@ -757,7 +842,7 @@ mod tests {
         let surf = st.doc.layers[0].surface().unwrap();
         for (x, y) in [(0, 0), (1, 1), (2, 3)] {
             let v = surf.rgba(x, y)[0];
-            assert!(v < 0.01 || v > 0.99, "nearest produced an averaged value {v} at ({x},{y})");
+            assert!(!(0.01..=0.99).contains(&v), "nearest produced an averaged value {v} at ({x},{y})");
         }
     }
 
