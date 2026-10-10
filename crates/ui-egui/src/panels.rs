@@ -1811,7 +1811,8 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         };
         let trash = icons::button(ui, "trash", 26.0, false, tl!(label));
         if trash.clicked() {
-            actions.push((delete.into(), json!({})));
+            let params = if delete == "layer.delete" { json!({"__trash": true}) } else { json!({}) };
+            actions.push((delete.into(), params));
         }
         actions.extend(footer_drop(ui, &trash, footer_drag, "layer.delete"));
         // A click follows the selected thumbnail; name that action for screen readers even

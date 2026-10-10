@@ -101,6 +101,7 @@ fn footer_trash_deletes_only_the_targeted_mask_linked_or_unlinked() {
             let at = h.get_by_label(label).rect().center();
             click_with(&mut h, at, Modifiers::NONE);
             let l = layer(&h, masked);
+            assert!(h.state().ui.dialogs.is_empty(), "mask deletion remains immediate");
             let original = before.layer(photocraft_doc::LayerId(masked)).unwrap();
             assert_eq!(l.content, original.content);
             assert_eq!(layer(&h, shape), *before.layer(photocraft_doc::LayerId(shape)).unwrap());
@@ -130,6 +131,10 @@ fn footer_trash_still_deletes_the_layer_when_its_content_is_targeted() {
     assert!(!h.state().ui.mask_target && !h.state().ui.vector_mask_target);
     let at = h.get_by_label("Delete layer").rect().center();
     click_with(&mut h, at, Modifiers::NONE);
+    assert!(h.state().session.active().unwrap().doc.layer(photocraft_doc::LayerId(masked)).is_some());
+    assert!(h.state().ui.dialogs.iter().any(|d| crate::delete_layer_prompt::owns(&d.fields)));
+    h.get_by_label("Delete").click();
+    h.run_steps(3);
     assert!(h.state().session.active().unwrap().doc.layer(photocraft_doc::LayerId(masked)).is_none());
 }
 
